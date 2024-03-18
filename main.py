@@ -26,7 +26,7 @@ def calculate_days_left(end_date_str):
 # Start time for processing
 start_time = timeit.default_timer()
 
-TOKEN = '6609388405:AAH1ibGQnTS_GyoMv-uwh_ypYBVPH7EXuA0'
+TOKEN = '6609388405:AAEGy2PrJe-y0MFfS8Z7Rx40I6aUoAiqAec'
 API_URL = 'https://prod-api.viewlift.com/identity'
 ADMIN_CHAT_ID = '5934858568'  # Replace with your admin chat ID
 CHANNEL_ID = -1002130591512 
