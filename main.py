@@ -4,8 +4,6 @@ import json
 import time
 import timeit
 import datetime
-from keep_alive import keep_alive
-keep_alive()
 
 def calculate_days_left(end_date_str):
     try:
